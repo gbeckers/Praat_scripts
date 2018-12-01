@@ -1,0 +1,190 @@
+# name:		rms equalize
+# author:	Gabriel J.L. Beckers (http://www.gbeckers.nl)
+# date:		June 03 2002
+#		* adapted November 12 2008 to only use parts where
+#		there is phonation.
+# purpose:	Equalizes the rms values of different Sound objects
+#		and scales them to a max peak value of 1
+# usage:	Select sound objects that need to be equalized for 
+#		rms value, then run script.
+#
+#		Note: you can enter the desired common rms value in
+#		the form. If you leave this value zero then the 
+#		script will set the common rms value so that the 
+#		peak amplitude in any of the files is 0.99996948 
+#		(which is the maximum value for a .wav file).
+#
+#		The other parameters are used to differentiate between 
+#		sound and silence. The script only uses those parts
+#		of your sound object where there is actual phonation.
+#		Note that default settings are for birdsong. Use 
+#		different ones for other sounds like speech.
+#		
+
+#############################################################################
+# Copyright (C) 2002-2008  Gabriel J.L. Beckers
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+#############################################################################
+
+form Equalize root-mean-square sound pressure
+	real root_mean_square_value 0 (= scale peak to 0.99996948)
+	real minimum_pitch_(Hz) 400
+	real silence_threshold_(dB) -40.0
+	real minimum_silent_interval_duration_(s) 0.01
+	real maximum_sounding_interval_duration_(s) 0.01
+endform
+
+clearinfo
+
+printline ---------------------------------
+printline original rms values
+printline ---------------------------------
+
+max_rms = 0
+max_peak = 0
+
+nr_of_sounds = numberOfSelected("Sound")
+
+# give each sound its own object id
+for i from 1 to nr_of_sounds
+	id_sound_'i' = selected("Sound",'i')
+endfor
+
+# now check for the original rms values and look for the maximum
+for i from 1 to nr_of_sounds
+	curr_ID = id_sound_'i'
+	select 'curr_ID'
+	name$ = selected$("Sound")
+	Subtract mean
+	rmscomplete = Get root-mean-square... 0 0
+	printline 'name$', complete sound:	'rmscomplete' 
+	To TextGrid (silences)...  minimum_pitch 0  silence_threshold minimum_silent_interval_duration maximum_sounding_interval_duration silent sounding
+	id_textgrid_'i' = selected("TextGrid")
+	plus curr_ID
+	Extract intervals where... 1 no "is equal to" sounding
+	nselected = numberOfSelected("Sound")
+	for j from 1 to nselected
+		sounding_'j' = selected("Sound", j)
+	endfor
+	Concatenate
+	concat_id = selected("Sound")
+	# first make sure that the mean is zero
+	Subtract mean
+	rms_'i' = Get root-mean-square... 0 0
+	if rms_'i' > max_rms
+		max_rms = rms_'i'
+	endif
+	curr_rms = rms_'i'
+	printline 'name$', silence excluded:	 'curr_rms'
+	for j from 1 to nselected
+		select sounding_'j'
+		Remove
+	endfor
+	select concat_id
+	Remove
+endfor
+
+printline ---------------------------------
+printline original peak values
+printline ---------------------------------
+
+for i from 1 to nr_of_sounds
+	curr_ID = id_sound_'i'
+	select 'curr_ID'
+	name$ = selected$("Sound")
+	peak = Get absolute extremum... 0 0 None
+	printline 'name$':	'peak'
+endfor
+
+# adjust each sound so that it matches the desired rms
+if root_mean_square_value != 0
+	to_rms = root_mean_square_value
+else
+	to_rms = max_rms
+endif
+
+for i from 1 to nr_of_sounds
+	curr_ID = id_sound_'i'
+	select 'curr_ID'
+	scale_factor = to_rms/rms_'i'
+	Multiply... scale_factor
+endfor
+
+# look for the peak amplitude in the sound list
+for i from 1 to nr_of_sounds
+	select all
+	curr_ID = id_sound_'i'
+	select 'curr_ID'
+	peak = Get absolute extremum... 0 0 None
+	if peak > max_peak
+		max_peak = peak
+	endif
+endfor
+
+printline -----------------------
+printline new rms values
+printline -----------------------
+for i from 1 to nr_of_sounds
+	select all
+	curr_ID = id_sound_'i'
+	select 'curr_ID'
+	name$ = selected$("Sound")
+	if root_mean_square_value == 0
+		Multiply... 0.99996948/max_peak
+	endif
+	rms = Get root-mean-square... 0 0
+	printline 'name$', complete sound:	'rms'
+	textgrid_ID = id_textgrid_'i'
+	select textgrid_ID
+	plus curr_ID
+	Extract intervals where... 1 no "is equal to" sounding
+	nselected = numberOfSelected("Sound")
+	for j from 1 to nselected
+		sounding_'j' = selected("Sound", j)
+	endfor
+	Concatenate
+	concat_id = selected("Sound")
+	# first make sure that the mean is zero
+	Subtract mean
+	rms_'i' = Get root-mean-square... 0 0
+	curr_rms = rms_'i'
+	printline 'name$', silence excluded:	 'curr_rms'
+	for j from 1 to nselected
+		select sounding_'j'
+		Remove
+	endfor
+	select concat_id
+	Remove
+endfor
+
+printline -----------------------
+printline new peak values
+printline -----------------------
+
+for i from 1 to nr_of_sounds
+	curr_ID = id_sound_'i'
+	select 'curr_ID'
+	name$ = selected$("Sound")
+	peak = Get absolute extremum... 0 0 None
+	printline 'name$':	'peak'
+endfor
+
+# select objects
+select 'id_sound_1'
+for i from 2 to nr_of_sounds
+	current_sound_id = id_sound_'i'
+	plus 'current_sound_id'
+endfor

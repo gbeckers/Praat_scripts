@@ -1,0 +1,78 @@
+# create frequency modulated harmonic signal
+# by Gabriel Beckers, 2002-10-24,  modified: 2003-11-03
+
+#############################################################################
+# Copyright (C) 2002-2003  Gabriel J.L. Beckers
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+#############################################################################
+
+# Method adapted from:
+# Chris Darwin, Experimental Psychology, 
+# University of Sussex
+
+# Make a harmonic synthetic signal on the basis of a time-frequency formula
+
+# usage: 	Run and enter the formula for the time-frequency pattern of 
+#		the fundamental	frequency, number of harmonics, harmonic decay
+#		start time, end time and sampling rate.
+
+
+
+form Synthesize signal
+	sentence formula_time-frequency_pattern 500+3000*sin(pi*x^2)
+	positive number_of_harmonics 10
+	real harmonic_decay_power -2
+	real start_(s) 0
+	real end_(s) 1
+	positive sampling_rate_(samples/s) 44100
+endform
+
+for i from 1 to number_of_harmonics
+	Create Sound... temp 'start' 'end' 'sampling_rate' 'i'*('formula_time-frequency_pattern$')
+	temp_sound_id = selected("Sound")
+	Down to Matrix
+	temp_matrix_id = selected("Matrix")
+	# Matrix temp now has the list of frequency values
+
+	Create Sound... harmonic_'i' 'start' 'end' 'sampling_rate' Matrix_temp(x)/'sampling_rate'
+	harmonic_'i'_id = selected("Sound")
+	# integrate phase-change to get actual local value
+	Formula... if (self + self[col-1]) >1 then (self + self[col-1])-1 else self + self[col-1] fi
+	
+	# turn phase into sine value
+	Formula... 'i'^'harmonic_decay_power'*sin(2*pi*self)
+
+	select 'temp_matrix_id'
+	plus 'temp_sound_id'
+	Remove
+endfor
+
+select 'harmonic_1_id'
+for i from 2 to number_of_harmonics
+	Formula... self+Sound_harmonic_'i'(x)
+endfor
+
+# clean up
+if number_of_harmonics > 1
+	select 'harmonic_2_id'
+	for i from 3 to number_of_harmonics
+		current_harmonic_id = harmonic_'i'_id
+		plus 'current_harmonic_id'
+	endfor
+	Remove
+endif
+select 'harmonic_1_id'
+Rename... signal

@@ -1,0 +1,65 @@
+# create harmonic signal
+
+# by Gabriel Beckers
+# 2004-01-09
+
+# Make a harmonic signal with specified fundamental frequency, number of
+# harmonics, and pattern of amplitude of harmonics
+# x = harmonic number (1 = f0, 2 = 2f0 etc.)
+
+
+form Synthesize harmonic signal
+	positive f0 300
+	positive number_of_harmonics 20
+	sentence formula_frequency_filtering_pattern x^-2
+	real start_(s) 0
+	real end_(s) 1
+	positive sampling_rate_(samples/s) 44100
+	choice phase 1
+		button random
+		button cosine
+endform
+
+nyquist_freq = sampling_rate/2
+max_harmonics = floor(nyquist_freq/f0)
+
+if max_harmonics < number_of_harmonics
+	number_of_harmonics = max_harmonics
+endif
+
+
+Create Matrix... amplitudes 1 'number_of_harmonics' 'number_of_harmonics' 1 1 1 1 1 1 1 'formula_frequency_filtering_pattern$'
+Formula... if self[col]<0 then 0 else self fi
+matrix_id = selected("Matrix")
+
+for i from 1 to number_of_harmonics
+	if phase$ == "random"
+		phase = randomUniform(0,2*pi)
+	elsif phase$ == "cosine"
+		phase = 0.5*pi
+	endif
+	Create Sound... harmonic_'i' 'start' 'end' 'sampling_rate'  Matrix_amplitudes['i']*sin(2*pi*x*'i'*'f0'+'phase')
+	harmonic_'i'_id = selected("Sound")
+endfor
+
+select 'harmonic_1_id'
+for i from 2 to number_of_harmonics
+	Formula... self+Sound_harmonic_'i'(x)
+endfor
+
+
+# clean up
+if number_of_harmonics > 1
+	select 'harmonic_2_id'
+	for i from 3 to number_of_harmonics
+		current_harmonic_id = harmonic_'i'_id
+		plus 'current_harmonic_id'
+	endfor
+	Remove
+endif
+select 'matrix_id'
+Remove
+
+select 'harmonic_1_id'
+Rename... harmonic_signal
+Scale... 0.99996948

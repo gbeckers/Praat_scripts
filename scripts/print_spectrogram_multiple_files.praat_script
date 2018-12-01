@@ -1,0 +1,125 @@
+form Print multiple spectrograms
+	sentence source_directory /home/user/soundfiles
+	sentence file_extension .wav
+	positive analysis_width 0.008
+	positive max_freq 10000
+	positive time_step 0.008
+	positive freq_step 50
+	positive freq_label_every_(Hz) 2000
+	positive seconds_per_sg 5
+	boolean frequency_grid 0
+	boolean save_eps 0
+	boolean print 1
+	choice paper_size: 3
+		button letter
+		button a4
+		button screen
+endform
+
+dir_separator$="/"
+
+window$ = "Gaussian"
+
+from_time = 0
+to_time = 0
+from_freq = 0
+to_freq = max_freq
+dynamic_range = 50
+pre_emphasis = 0
+dynamic_compression = 0
+garnish = 0
+
+if paper_size$=="a4"
+	sg_width = 7.4
+	sg_height = 2.50
+	y_step = 2.05
+	number_of_sgs_per_page = 5
+endif
+
+if paper_size$=="letter"
+	sg_width = 8
+	sg_height = 2.40
+	y_step = 1.95
+	number_of_sgs_per_page = 5
+
+endif
+
+if paper_size$=="screen"
+	sg_width = 12
+	sg_height = 3.1
+	y_step = 2.7
+	number_of_sgs_per_page = 3
+endif
+
+Font size... 9
+Create Strings as file list... list 'source_directory$''dir_separator$'*'file_extension$'
+Sort
+number_of_files = Get number of strings
+
+Erase all
+
+y_pos = 0
+sg_nr = 1
+for ifile to number_of_files
+	select Strings list
+	file_name$ = Get string... ifile
+	Read from file... 'source_directory$'/'file_name$'
+	duration = Get duration
+	min = Get minimum... 0 0 None
+	max = Get maximum... 0 0 None
+	sound_ID = selected("Sound")
+	To Spectrogram... analysis_width max_freq time_step freq_step 'window$'
+	specgram_ID = selected("Spectrogram")
+	number_of_sgs = ceiling(duration/seconds_per_sg)
+	begin_time = 0
+	for sg = 1 to number_of_sgs
+		Viewport... 0 sg_width y_pos y_pos+sg_height
+		select 'specgram_ID'
+		Paint... begin_time begin_time+seconds_per_sg from_freq to_freq 100 yes dynamic_range pre_emphasis dynamic_compression garnish
+		Draw inner box
+		if frequency_grid == 1
+			Marks left every... 1 'freq_label_every' yes yes yes
+		else
+			Marks left every... 1 'freq_label_every' yes yes no
+		endif
+		Text right... no
+		Text... begin_time+seconds_per_sg-0.05 Right max_freq Top 'file_name$'
+		if (max > 0.99) or (min < -0.99)
+			Text... begin_time+0.05 Left max_freq Top ##PROBABLY CLIPPED
+		endif
+		Marks bottom every... 1 1 yes yes no
+		Marks bottom every... 1 0.5 no yes no
+		y_pos = y_pos+y_step
+		sg_nr = sg_nr+1
+		begin_time = begin_time + seconds_per_sg
+		if sg_nr > number_of_sgs_per_page
+			Text bottom... yes time (s)
+			Viewport... 0 sg_width 0 y_pos-y_step+sg_height
+			Text left... yes frequency (Hz)
+			if save_eps == 1
+				if ifile < 10
+					file_number$ = "000"+"'ifile'"
+				elsif ifile < 100
+					file_number$ = "00"+"'ifile'"
+				elsif ifile < 1000
+					file_number$ = "0"+"'ifile'"
+				endif
+				Write to EPS file... 'source_directory$''dir_separator$'praat_'file_number$'.eps
+			endif
+			if print ==1
+				pause "print this page and then continue"
+			endif
+			sg_nr = 1
+			Erase all
+			y_pos = 0
+		endif
+	endfor
+	select 'sound_ID'
+	Remove
+	select 'specgram_ID'
+	Remove
+	if ifile = number_of_files
+		Text bottom... yes time (s)
+	endif
+
+endfor

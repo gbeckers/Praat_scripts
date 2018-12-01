@@ -1,0 +1,55 @@
+# decompose fm am
+# by Gabriel Beckers, 2003-12-18
+
+#############################################################################
+# Copyright (C) 2003  Gabriel J.L. Beckers
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+#############################################################################
+
+# purpose:	calculates the frequency modulation part of a sound and the
+#		amplitude envelope, using the analytic signal method (Hilbert transform)
+
+# usage:        Select sound and run
+
+
+original_id = selected("Sound")
+name$ = selected$("Sound")
+duration = Get duration
+
+Copy... temp
+temp_id = selected("Sound")
+To Spectrum (fft)
+spectrum_temp_id = selected("Spectrum")
+Copy... hilbert
+spectrum_hilbert_id = selected("Spectrum")
+Formula... if row=1 then Spectrum_temp[2,col] else -Spectrum_temp[1,col] fi
+To Sound (fft)
+Formula... sqrt(self^2+Sound_temp[col]^2)
+sound_hilbert_id = selected("Sound")
+Extract part... 0 duration Rectangular 1 no
+Rename... 'name$'_amp_envel
+
+
+select 'temp_id'
+Rename... 'name$'_fm_part
+Formula... self/Sound_hilbert[col]
+
+select 'spectrum_temp_id'
+plus 'spectrum_hilbert_id'
+plus 'sound_hilbert_id'
+Remove
+
+select 'original_id'

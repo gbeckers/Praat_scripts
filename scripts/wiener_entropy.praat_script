@@ -1,0 +1,103 @@
+# Copyright (C) 2004  Gabriel J.L. Beckers
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+
+# Wiener entropy, by Gabriel J.L. Beckers
+# developed in Praat version 4.2.06
+# 2004-07-03
+
+# Wiener entropy is a measure of spectral flatness of a sound.
+# It is defined as the ratio of a power spectrum's geometric mean and
+# its arithmetic mean. It is scaled to a log scale, which ranges from
+# 0 (power spectrum is flat) to minus infinity (power spectrum is 
+# infinitely narrow).
+
+# Usage: select a sound object and run.
+
+frame_duration = 0.01
+time_step = 0.004
+start_frequency = 300
+end_frequency = 10000
+
+clearinfo
+
+sound_id = selected("Sound")
+sound_name$ = selected$("Sound")
+
+sampling_period = Get sampling period
+
+duration = Get total duration
+start_time = Get starting time
+number_of_steps = floor((duration-frame_duration)/time_step) + 1
+
+sum_wiener_entropy = 0
+for frame_no from 1 to number_of_steps
+	Extract part... start_time start_time+frame_duration Gaussian1 1 yes
+	sound_frame_id = selected("Sound")
+	#printline 'start_time'
+	start_time = start_time + time_step
+
+	To Spectrum (dft)
+	spectrum_id = selected("Spectrum")
+	Rename... Spectrum
+	number_of_bins = Get number of bins
+
+	highest_frequency = Get highest frequency
+	if highest_frequency < end_frequency
+		end_frequency = highest_frequency
+	endif
+	start_bin = Get bin number from frequency... 'start_frequency'
+	end_bin = Get bin number from frequency... 'end_frequency'
+	start_bin = round(start_bin)
+	end_bin = round(end_bin)
+	actual_start_frequency = Get frequency from bin number... 'start_bin'
+	actual_end_frequency = Get frequency from bin number... 'end_bin'
+	number_of_band_bins = end_bin - start_bin + 1
+
+	Create simple Matrix... power_spectrum 1 'number_of_band_bins' 0
+	power_spectrum_id = selected("Matrix")
+	Formula... ((Spectrum_Spectrum [1,col]/sampling_period)^2 + (Spectrum_Spectrum [2,col]/sampling_period)^2)
+
+	sum_power_spectrum = 0
+	for bin from start_bin to end_bin
+		sum_power_spectrum += Matrix_power_spectrum[1,bin]
+	endfor
+	arithmetic_mean = sum_power_spectrum/number_of_bins
+	
+	Create simple Matrix... ln_power_spectrum 1 'number_of_band_bins' 0
+	ln_power_spectrum_id = selected("Matrix")
+	Formula... ln(Matrix_power_spectrum[])
+
+	sum_ln_power_spectrum = 0
+	for bin from start_bin to end_bin
+		sum_ln_power_spectrum += Matrix_ln_power_spectrum[1,bin]
+	endfor
+	geometric_mean = exp(sum_ln_power_spectrum/number_of_band_bins)
+
+	frame_wiener_entropy = ln(geometric_mean/arithmetic_mean)
+	#printline wiener entropy frame 'frame_no': 'frame_wiener_entropy'
+	sum_wiener_entropy += frame_wiener_entropy
+
+	select 'spectrum_id'
+	plus 'power_spectrum_id'	
+	plus 'ln_power_spectrum_id'
+	plus 'sound_frame_id'
+	Remove
+	select 'sound_id'
+
+endfor
+
+wiener_entropy = sum_wiener_entropy/number_of_steps
+printline mean wiener entropy: 'wiener_entropy'
